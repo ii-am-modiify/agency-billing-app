@@ -35,35 +35,48 @@ function renderInvoicePdf(invoice, agency, billingPeriod, billerName = 'Tampa Ba
     const lightBg = '#f5f8ff';
 
     // ── Header ──
-    doc.fontSize(22).fillColor(blue).font('Helvetica-Bold').text(billerName, 54, 54);
-    doc.fontSize(10).fillColor(gray).font('Helvetica').text('Billing & Home Health Services', 54, 80);
+    const leftColW = 280; // left side for biller name
+    const rightColX = 370; // right side for INVOICE meta
+    const rightColW = 612 - 54 - rightColX;
+
+    // Auto-size biller name to fit left column
+    let titleSize = 22;
+    doc.font('Helvetica-Bold');
+    while (titleSize > 12 && doc.widthOfString(billerName, { fontSize: titleSize }) > leftColW) {
+      titleSize -= 1;
+    }
+    doc.fontSize(titleSize).fillColor(blue).text(billerName, 54, 54, { width: leftColW });
+    const titleBottom = 54 + doc.heightOfString(billerName, { width: leftColW, fontSize: titleSize });
+    doc.fontSize(10).fillColor(gray).font('Helvetica').text('Billing & Home Health Services', 54, titleBottom + 4, { width: leftColW });
 
     // Invoice meta (right side)
-    doc.fontSize(20).fillColor(darkGray).font('Helvetica-Bold').text('INVOICE', 350, 54, { align: 'right', width: pageW - 296 });
-    const badgeX = 504 - 12;
+    doc.fontSize(20).fillColor(darkGray).font('Helvetica-Bold').text('INVOICE', rightColX, 54, { align: 'right', width: rightColW });
     const invNumW = doc.widthOfString(invoice.invoiceNumber, { fontSize: 10 });
     doc.roundedRect(612 - 54 - invNumW - 16, 80, invNumW + 16, 18, 3)
       .fillAndStroke('#e8f4fd', blue);
     doc.fontSize(10).fillColor(blue).font('Helvetica-Bold')
       .text(invoice.invoiceNumber, 612 - 54 - invNumW - 8, 84);
     doc.font('Helvetica').fillColor('#555555').fontSize(10);
-    doc.text(`Period: ${billingPeriod?.label || ''}`, 350, 104, { align: 'right', width: pageW - 296 });
+    doc.text(`Period: ${billingPeriod?.label || ''}`, rightColX, 104, { align: 'right', width: rightColW });
     const dueDate = invoice.dueDate && (new Date(invoice.dueDate) > new Date(Date.now() + 86400000))
       ? formatDate(invoice.dueDate) : 'Due on Receipt';
-    doc.text(`Due: ${dueDate}`, 350, 118, { align: 'right', width: pageW - 296 });
+    doc.text(`Due: ${dueDate}`, rightColX, 118, { align: 'right', width: rightColW });
 
     // ── Bill To / From ──
     let y = 150;
-    doc.fontSize(8).fillColor('#888888').font('Helvetica-Bold').text('BILL TO', 54, y);
-    doc.fontSize(8).text('FROM', 320, y);
+    const billToW = 250;
+    const fromX = 340;
+    const fromW = 612 - 54 - fromX;
+    doc.fontSize(8).fillColor('#888888').font('Helvetica-Bold').text('BILL TO', 54, y, { width: billToW });
+    doc.text('FROM', fromX, y, { width: fromW });
     y += 16;
-    doc.fontSize(11).fillColor('#222222').font('Helvetica-Bold').text(agency?.name || '', 54, y);
-    doc.text(billerName, 320, y);
-    y += 16;
+    doc.fontSize(11).fillColor('#222222').font('Helvetica-Bold').text(agency?.name || '', 54, y, { width: billToW });
+    doc.text(billerName, fromX, y, { width: fromW });
+    y += doc.heightOfString(billerName, { width: fromW, fontSize: 11 }) + 2;
     doc.font('Helvetica').fontSize(10).fillColor('#444444');
-    if (agency?.contactEmail) doc.text(agency.contactEmail, 54, y);
-    doc.text('Wesley Chapel, FL', 320, y);
-    if (agency?.contactName) { y += 14; doc.text(`Attn: ${agency.contactName}`, 54, y); }
+    if (agency?.contactEmail) { doc.text(agency.contactEmail, 54, y, { width: billToW }); }
+    doc.text('Wesley Chapel, FL', fromX, y, { width: fromW });
+    if (agency?.contactName) { y += 14; doc.text(`Attn: ${agency.contactName}`, 54, y, { width: billToW }); }
 
     // ── Table ──
     y += 30;
@@ -107,12 +120,13 @@ function renderInvoicePdf(invoice, agency, billingPeriod, billerName = 'Tampa Ba
       doc.rect(54, y + rowH, pageW, 0.5).fill('#e0e0e0');
       doc.fillColor('#222222');
 
-      doc.text(item.patientName || '', cols[0].x + 6, y + 5, { width: cols[0].w - 12 });
-      doc.text(item.date || '', cols[1].x + 6, y + 5, { width: cols[1].w - 12 });
+      const cellOpts = { width: 0, lineBreak: false, ellipsis: true, height: rowH - 4 };
+      doc.text(item.patientName || '', cols[0].x + 6, y + 5, { ...cellOpts, width: cols[0].w - 12 });
+      doc.text(item.date || '', cols[1].x + 6, y + 5, { ...cellOpts, width: cols[1].w - 12 });
       const clinLabel = `${item.clinicianName || ''}${item.clinicianTitle ? ` (${item.clinicianTitle})` : ''}`;
-      doc.text(clinLabel, cols[2].x + 6, y + 5, { width: cols[2].w - 12 });
-      doc.text(item.careType || '', cols[3].x + 6, y + 5, { width: cols[3].w - 12 });
-      doc.font('Helvetica-Bold').text(formatCurrency(item.amount), cols[4].x + 6, y + 5, { width: cols[4].w - 12, align: 'right' });
+      doc.text(clinLabel, cols[2].x + 6, y + 5, { ...cellOpts, width: cols[2].w - 12 });
+      doc.text(item.careType || '', cols[3].x + 6, y + 5, { ...cellOpts, width: cols[3].w - 12 });
+      doc.font('Helvetica-Bold').text(formatCurrency(item.amount), cols[4].x + 6, y + 5, { ...cellOpts, width: cols[4].w - 12, align: 'right' });
       doc.font('Helvetica');
       y += rowH;
     }
