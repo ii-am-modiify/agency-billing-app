@@ -113,10 +113,26 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message });
 });
 
+async function autoSeedIfEmpty() {
+  const Timesheet = require('./models/timesheet');
+  const count = await Timesheet.countDocuments();
+  if (count === 0) {
+    console.log('[Boot] Empty database detected — running demo seed...');
+    const { execSync } = require('child_process');
+    execSync('node seed-demo.js', { cwd: __dirname, stdio: 'inherit' });
+    console.log('[Boot] Demo seed complete!');
+  } else {
+    console.log(`[Boot] Database has ${count.toLocaleString()} timesheets — skipping seed`);
+  }
+}
+
 async function main() {
   try {
     console.log('[Boot] Connecting to MongoDB...');
     await connectDB();
+
+    // Auto-seed demo data on first run
+    await autoSeedIfEmpty();
 
     console.log('[Boot] Initializing Gmail service...');
     await gmail.init();

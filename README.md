@@ -1,269 +1,173 @@
-# Billing Automation System
+# Agency Billing Automation System
 
-Clinical timesheet billing automation for **Tampa Bay OT LLC** — a home health billing agency that processes handwritten timesheets for 15+ healthcare agencies with 30+ clinicians.
+A full-stack billing automation system built for home health staffing agencies. Manages timesheets, generates invoices, tracks payroll, and provides real-time financial dashboards.
 
-## What It Does
+**Live Demo:** [staffing-agency-demo.fltechadventures.com](https://staffing-agency-demo.fltechadventures.com/)
 
-1. **Timesheet intake** — Upload photos of handwritten timesheets (or receive via Gmail)
-2. **AI OCR** — Claude Vision extracts patient name, clinician, dates, times, visit codes
-3. **Auto-matching** — Fuzzy-matches clinicians, patients, and agencies to existing records
-4. **Invoice generation** — Groups visits by agency, applies per-code billing rates, generates PDF invoices with timesheet images appended
-5. **Payroll tracking** — Calculates clinician hours and pay
-6. **Payment tracking** — Mark invoices sent/paid, track outstanding balances
-
-## Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Backend | Node.js 20 + Express |
-| Frontend | React 18 + Tailwind CSS (Vite build, served as static) |
-| Database | MongoDB 7 (Docker, internal network only — never exposed) |
-| OCR | Anthropic Claude Vision API (Opus for OCR, Sonnet for classification) |
-| PDF | Puppeteer (HTML→PDF) + pdf-lib (append timesheet images) |
-| Email | Gmail API (optional — stubbed until credentials provided) |
-| Container | Docker + docker-compose |
+![Dashboard Overview](billing-agency-dashboard.png)
 
 ## Quick Start
 
 ```bash
-# 1. Copy environment file
+git clone git@github.com:ii-am-modiify/agency-billing-app.git
+cd agency-billing-app
 cp .env.example .env
-# → Set ANTHROPIC_API_KEY (required for OCR)
-
-# 2. Build and start
-docker-compose up -d --build
-
-# 3. Open dashboard
-open http://localhost:3001
+docker-compose up -d
 ```
 
-## Environment Variables
+That's it. The app auto-seeds 20,775 timesheets across 14 months of demo data on first boot.
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | ✅ | Claude API key for OCR processing |
-| `MONGO_URI` | No | MongoDB connection (default: `mongodb://mongo:27017/billing`) |
-| `PORT` | No | Server port (default: `3001`) |
-| `GMAIL_USER_EMAIL` | No | Gmail address for email polling |
-| `GMAIL_CREDENTIALS_PATH` | No | Path to Google service account JSON |
+**Open:** [http://localhost:3021](http://localhost:3021)
+
+## What It Does
+
+- **Timesheet Management** — Upload, OCR process, review, and approve clinical timesheets
+- **Invoice Generation** — One-click invoice creation from approved timesheets with PDF generation
+- **Payroll Tracking** — Clinician payroll calculations with adjustments and payment tracking
+- **Billing Dashboard** — Real-time overview of revenue, hours, profit margins, and status breakdowns
+- **Settings Management** — Manage agencies, clinicians, patients, and billing codes
+
+## Tech Stack
+
+| Layer | Tech |
+|-------|------|
+| Frontend | React 18 + Vite + Tailwind CSS |
+| Backend | Express.js + Node 20 |
+| Database | MongoDB 7 |
+| PDF Generation | PDFKit (pure code, no headless browser) |
+| Containerization | Docker + Docker Compose |
+| Security | Helmet CSP, CORS, rate limiting, NoSQL sanitization |
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│  React SPA (Vite + Tailwind)                │
+│  Landing Page → Dashboard → Pages           │
+├─────────────────────────────────────────────┤
+│  Express API                                │
+│  /api/timesheets  /api/invoices             │
+│  /api/payroll     /api/settings             │
+├─────────────────────────────────────────────┤
+│  MongoDB 7                                  │
+│  Timesheets, Invoices, Agencies,            │
+│  Clinicians, Patients, Billing Periods      │
+├─────────────────────────────────────────────┤
+│  PDFKit Invoice Generator                   │
+│  ~7,500 PDFs/min (no Puppeteer needed)      │
+└─────────────────────────────────────────────┘
+```
+
+## Demo Data
+
+The seed script (`app/seed-demo.js`) generates realistic demo data:
+
+- **50 agencies** (home health, staffing, nursing services)
+- **100 clinicians** (RN, LPN, OT, PT, SLP, COTA, PTA)
+- **3,000 patients**
+- **20,775 timesheets** across 14 months (Jan 2025 → Feb 2026)
+- **~672 timesheets per bi-weekly period**
+- **1,500 invoices** with auto-generated PDFs
+- **31 billing periods** with bi-weekly anchor on Dec 22, 2024
+
+### Reseed Data
+
+```bash
+docker exec billing-demo-app node seed-demo.js
+```
+
+### Generate All Invoice PDFs
+
+```bash
+docker exec billing-demo-app node generate-pdfs.js
+```
+
+## Key Features
+
+### Billing Dashboard
+- Period selector (Current/Previous Bi-Weekly, Monthly, Quarterly, YTD, All Time)
+- Revenue tracking with trend indicators vs prior period
+- Hours, payroll, and profit margin cards
+- Collapsible invoice previews and timesheet summaries
+
+### Timesheets
+- Search by patient, clinician, or agency name
+- Collapsible filter panel (status, agency, clinician, care type, date range)
+- 30-per-page pagination
+- Upload + OCR processing pipeline
+
+### Invoices
+- Tabbed workflow: Review → Outstanding → Paid
+- Click any invoice for slide-out preview
+- One-click "Send to Agency" (simulated in demo)
+- PDF generation via PDFKit (~7,500/min)
+
+### Payroll
+- Clinician payroll summary with hours and pay calculations
+- Adjustment modal for manual corrections
+- Mark Paid workflow with payment tracking
+- Paid/unpaid filtering
+
+### Settings
+- Agency, Clinician, Patient, and Billing Code management
+- Search + pagination (30 per page)
+- Add/edit/delete with inline forms
+
+## Security
+
+- **Helmet** — CSP headers, X-Frame-Options, HSTS
+- **CORS** — Locked to approved origins
+- **Rate Limiting** — 100 req/min API, 10/5min uploads
+- **NoSQL Sanitization** — Strips `$`-prefixed keys from request bodies
+- **No Auth (Demo)** — Intentionally open for demo; production version adds authentication
 
 ## Project Structure
 
 ```
-billing-automation/
-├── Dockerfile                    # Node 20 + Chromium for Puppeteer
-├── docker-compose.yml            # App + MongoDB containers
-├── .env.example                  # Environment template
 ├── app/
-│   ├── index.js                  # Express server entry point
-│   ├── models/
-│   │   ├── agency.js             # Healthcare agencies (name, rates, contacts)
-│   │   ├── clinician.js          # Clinicians (name, title, pay rate, agencies)
-│   │   ├── patient.js            # Patients (name, record #, agency)
-│   │   ├── timesheet.js          # Timesheet records (OCR data, images, status)
-│   │   ├── invoice.js            # Generated invoices (line items, PDF, status)
-│   │   ├── billing-period.js     # Biweekly billing cycles
-│   │   ├── billing-code.js       # Visit type codes (P, EVAL, RE-EVAL, etc.)
-│   │   └── settings.js           # Key-value system settings
-│   ├── routes/
-│   │   ├── timesheets.js         # Upload, list, edit, reprocess, delete
-│   │   ├── invoices.js           # Generate, list, mark sent/paid, PDF download
-│   │   ├── payroll.js            # Payroll summaries
-│   │   └── settings.js           # Agencies, clinicians, patients, billing config
-│   ├── services/
-│   │   ├── ocr.js                # Claude Vision OCR + document classification
-│   │   ├── billing.js            # Invoice generation, rate resolution, previews
-│   │   ├── pdf.js                # Puppeteer PDF rendering + image appending
-│   │   └── gmail.js              # Gmail API integration (stub mode available)
-│   ├── scripts/
-│   │   └── fix-duplicate-records.js  # One-time cleanup for duplicate patient records
-│   └── frontend/
-│       ├── src/
-│       │   ├── App.jsx           # Router — Overview, Timesheets, Invoices, Payroll, Settings
-│       │   ├── pages/
-│       │   │   ├── Overview.jsx  # Dashboard with stats, summaries, timecards
-│       │   │   ├── Timesheets.jsx # Upload, view, edit, re-OCR timesheets
-│       │   │   ├── Invoices.jsx  # Generate, view, mark sent/paid
-│       │   │   ├── Payroll.jsx   # Clinician hours and pay breakdown
-│       │   │   └── Settings.jsx  # Agencies, patients, clinicians, billing codes, periods
-│       │   └── components/
-│       │       └── PeriodSelector.jsx  # Date range / billing period picker
-│       └── dist/                 # Built frontend (served by Express)
-└── docs/
-    └── USER_GUIDE.md             # End-user guide for Sandra / billing staff
+│   ├── frontend/          # React + Vite + Tailwind
+│   │   ├── src/
+│   │   │   ├── pages/     # Overview, Timesheets, Invoices, Payroll, Settings
+│   │   │   └── components/# PeriodSelector, Skeleton, etc.
+│   │   └── public/        # Screenshots, static assets
+│   ├── models/            # Mongoose schemas
+│   ├── routes/            # Express API routes
+│   ├── services/          # PDF, billing, OCR, Gmail
+│   ├── middleware/         # NoSQL sanitization
+│   ├── cron/              # Billing cycle, email poller (disabled in demo)
+│   ├── seed-demo.js       # Demo data generator
+│   ├── generate-pdfs.js   # Batch PDF generator
+│   └── index.js           # Express server entry
+├── Dockerfile             # Node 20 slim (no Chromium!)
+├── docker-compose.yml     # App + MongoDB
+├── mongo-init.js          # DB user setup
+└── reset-demo.sh          # Daily reset script
 ```
 
-## Data Architecture
+## Environment Variables
 
-```
-MongoDB (internal Docker network only)
-├── timesheets       — OCR data, image paths, visit details, status workflow
-├── agencies         — Healthcare agencies + per-code billing rate cards
-├── clinicians       — Clinician profiles, titles, pay rates, agency assignments
-├── patients         — Patient records with clinical record numbers (unique)
-├── billing_codes    — Master list: P, EVAL, RE-EVAL, DC, HT, WC, SV, etc.
-├── billing_periods  — Biweekly cycles with auto-generation support
-├── invoices         — Generated invoices with line items, PDF paths, payment status
-└── settings         — System config (biller name, default rates, cycle settings)
-```
+See `.env.example` for all available config. Key vars:
 
-## Billing Codes
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DB_USER` | `billing` | MongoDB app user |
+| `DB_PASSWORD` | `demodemo` | MongoDB app password |
+| `DB_NAME` | `billing_demo` | Database name |
+| `DB_ROOT_PASSWORD` | `demorootpass` | MongoDB root password |
+| `APP_PORT` | `3001` | Express server port |
+| `ANTHROPIC_API_KEY` | _(optional)_ | For OCR processing |
 
-| Code | Description | Default Rate |
-|------|------------|-------------|
-| P | Patient Visit (PT, OT, SN) | $85 |
-| X | Psych RN Visit | $95 |
-| EVAL | Evaluation | $150 |
-| RE-EVAL | Re-evaluation | $120 |
-| HT | High Tech Infusion | $120 |
-| WC | Wound Care | $110 |
-| S/U | Sign Up Visit | $75 |
-| SV | Supervisory Visit | $60 |
-| Hmk | Homemaker | $45 |
+## Daily Reset (Production Demo)
 
-Rates are configurable per agency via rate cards in Settings → Agencies.
+For a public-facing demo, set up a cron to reset data daily:
 
-## API Reference
-
-### Timesheets
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/timesheets` | List (filterable by status, agency, date range) |
-| GET | `/api/timesheets/revenue` | **Projected revenue from timecards** (before invoicing), filterable by date range |
-| GET | `/api/timesheets/:id` | Get single timesheet with populated refs |
-| POST | `/api/timesheets/upload` | Upload image → auto OCR |
-| POST | `/api/timesheets/backfill` | Bulk insert structured historical data |
-| PUT | `/api/timesheets/:id` | Manual correction |
-| POST | `/api/timesheets/:id/reprocess` | Re-run OCR |
-| GET | `/api/timesheets/:id/image` | Serve timesheet image |
-| DELETE | `/api/timesheets/:id` | Delete timesheet + image |
-
-### Invoices
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/invoices` | List invoices (filterable) |
-| POST | `/api/invoices/generate` | Generate invoices for a billing period |
-| GET | `/api/invoices/preview` | Live invoice preview for current period |
-| GET | `/api/invoices/:id/pdf` | Download invoice PDF |
-| PATCH | `/api/invoices/:id/mark-sent` | Mark as sent |
-| PATCH | `/api/invoices/:id/mark-paid` | Record payment |
-| GET | `/api/invoices/stats/summary` | Revenue/payment statistics |
-
-### Settings
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET/PUT | `/api/settings` | General settings |
-| GET/POST/PUT/DELETE | `/api/settings/agencies` | Agency CRUD |
-| GET/POST/PUT/DELETE | `/api/settings/clinicians` | Clinician CRUD |
-| GET/POST/PUT/DELETE | `/api/settings/patients` | Patient CRUD |
-| GET/POST/PUT/DELETE | `/api/settings/billing-codes` | Billing code CRUD |
-| GET/POST/PUT/DELETE | `/api/settings/billing-periods` | Billing period CRUD |
-
-### Other
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Health check + Gmail status |
-| GET | `/api/payroll` | Payroll summary (filterable by date) |
-| GET | `/api/settings/gmail/status` | Gmail connection status |
-
-## OCR Pipeline
-
-1. **Upload** — Image saved to `/app/data/images/`, SHA-256 hash checked for duplicates
-2. **Classification** — Claude Sonnet classifies as `timesheet` or `discharge` document
-3. **Extraction** — Claude Opus extracts all fields from handwritten timesheet:
-   - Agency name, year
-   - Employee name and title (PTA, RN, OT, etc.)
-   - Patient name (Last, First format preserved)
-   - Clinical record number
-   - Visit rows: day, date, time in/out, duration, visit code
-   - Confidence score (0.0 - 1.0)
-4. **Auto-matching** — Fuzzy match (Levenshtein, 70% threshold) against existing:
-   - Agencies → create if new
-   - Clinicians → create if new
-   - Patients → create if new, update record # if missing
-5. **Flagging** — Confidence < 80% → flagged for human review
-6. **Discharge docs** — Attached to most recent timesheet (within 5 min window)
-
-## Revenue Before Invoicing (Timecard-Based)
-
-The dashboard's **Projected Revenue** is calculated directly from timecards, so you can see expected revenue **before generating invoices**.
-
-- Source: `processed`, `reviewed`, and `invoiced` timesheets
-- Calculation: visit count × resolved billing rate
-- Rate resolution priority:
-  1. Agency rate card for visit code (e.g. EVAL, RE-EVAL, DC, P)
-  2. Agency default rate
-  3. System default rate
-- Endpoint: `GET /api/timesheets/revenue?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`
-- Overview uses this endpoint for projected revenue, visits, agency count, and profit margin
-
-## Invoice Generation
-
-1. Select billing period → click Generate
-2. System groups all processed/reviewed timesheets by agency
-3. For each agency:
-   - Resolves billing rate per visit code (agency rate card → agency default → system default)
-   - Builds line items sorted by patient name then date
-   - Generates PDF: invoice summary page + appended timesheet images (portrait)
-   - Uses biller name: **Tampa Bay OT LLC**
-   - Uses payment terms default: **Due on Receipt** (unless agency terms override)
-   - Creates Gmail draft (if configured) with invoice PDF attached
-4. Timesheets marked as `invoiced`, period marked as `closed`
-
-## Maintenance
-
-### Retention & Backup Policy
-See: `docs/RETENTION_BACKUP_PLAN.md`
-
-Policy summary:
-- Daily backups (DB + files)
-- Billing-cycle snapshots at each cycle close
-- 7-year retention history
-
-### Backup MongoDB
 ```bash
-docker exec billing-automation-mongo mongodump --out /data/backup
-docker cp billing-automation-mongo:/data/backup ./backup-$(date +%Y%m%d)
+# crontab -e
+0 4 * * * /path/to/reset-demo.sh
 ```
-
-### Fix Duplicate Patient Records
-```bash
-docker exec billing-automation-app node scripts/fix-duplicate-records.js
-```
-
-### Rebuild Frontend
-```bash
-cd app/frontend && npm run build
-# Then rebuild container
-docker-compose down && docker-compose up -d --build --force-recreate
-```
-
-### View Logs
-```bash
-docker logs -f billing-automation-app
-```
-
-## HIPAA Considerations
-
-- MongoDB never exposed to host network (internal Docker network only)
-- All PHI stored in Docker volumes (encrypted at rest if host supports it)
-- Human review required before invoices are sent (draft-only mode)
-- No auto-sending emails — Gmail creates drafts only
-- Patient clinical record numbers have unique constraint (no accidental dupes)
-- Audit trail via MongoDB timestamps on all documents
-- Discharge documents tracked and linked to patient records
-
-## Costs
-
-| Item | Monthly Cost |
-|------|-------------|
-| Claude Vision API | ~$2-5 (depends on volume) |
-| Hosting | $0 (runs on existing Hetzner VPS) |
-| Gmail API | $0 (free with Google Workspace) |
-| MongoDB | $0 (self-hosted) |
-| **Total** | **~$2-5/month** |
 
 ## Built By
 
-**Tech Adventures** — Wesley Chapel, FL  
-[fltechadventures.com](https://fltechadventures.com)
+**[Tech Adventures](https://fltechadventures.com)** — Business automation, managed IT, and web development for Tampa Bay businesses.
+
+Contact: alain@fltechadventures.com
