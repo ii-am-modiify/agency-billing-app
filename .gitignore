@@ -1,0 +1,41 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+app/node_modules/
+
+# Frontend build (rebuilt in Docker)
+app/frontend/dist/
+
+# Data volumes (DB data, uploaded images, generated PDFs)
+app/data/
+mongo-data/
+
+# Docker overrides
+docker-compose.override.yml
+docker-compose.test.yml
+
+# Client-specific docs (not for public repo)
+client-proposal.*
+email-to-sandra.*
+internal-notes.*
+ocr-summary.*
+timesheets/
+
+# Editor / OS
+.DS_Store
+.vscode/
+*.swp
+*.swo
+*~
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Package lock (optional — remove this line if you want deterministic builds)
+# app/package-lock.json
