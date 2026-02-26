@@ -4,7 +4,7 @@ A full-stack billing automation system built for home health staffing agencies. 
 
 **Live Demo:** [staffing-agency-demo.fltechadventures.com](https://staffing-agency-demo.fltechadventures.com/)
 
-![Dashboard Overview](billing-agency-dashboard.png)
+![Dashboard Overview](dashboard-overview.png)
 
 ## Quick Start
 
