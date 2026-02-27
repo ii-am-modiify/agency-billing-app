@@ -71,12 +71,18 @@ app.use(fileUpload({
 // Sanitize inputs against NoSQL injection
 app.use(require('./middleware/sanitize'));
 
-// API Routes
-app.use('/api/timesheets', require('./routes/timesheets'));
-app.use('/api/invoices', require('./routes/invoices'));
-app.use('/api/payroll', require('./routes/payroll'));
-app.use('/api/settings', require('./routes/settings'));
-app.use('/api/bug-reports', require('./routes/bug-reports'));
+// Auth routes (always mounted for user management)
+app.use('/api/auth', require('./routes/auth'));
+
+// Conditionally protect API routes (AUTH_ENABLED=true in client deploys)
+const authMiddleware = require('./middleware/auth');
+const authGuard = process.env.AUTH_ENABLED === 'true' ? authMiddleware : (req, res, next) => next();
+
+app.use('/api/timesheets', authGuard, require('./routes/timesheets'));
+app.use('/api/invoices', authGuard, require('./routes/invoices'));
+app.use('/api/payroll', authGuard, require('./routes/payroll'));
+app.use('/api/settings', authGuard, require('./routes/settings'));
+app.use('/api/bug-reports', authGuard, require('./routes/bug-reports'));
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -1,25 +1,26 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
+import Login from './pages/Login';
 import Overview from './pages/Overview';
 import Timesheets from './pages/Timesheets';
 import Invoices from './pages/Invoices';
 import Payroll from './pages/Payroll';
 import Settings from './pages/Settings';
 import BugReporter from './components/BugReporter';
-import Landing from './pages/Landing';
 
 const NAV_ITEMS = [
-  { path: '/dashboard', label: 'Overview', icon: '📊' },
-  { path: '/dashboard/timesheets', label: 'Timesheets', icon: '📋' },
-  { path: '/dashboard/invoices', label: 'Invoices', icon: '🧾' },
-  { path: '/dashboard/payroll', label: 'Payroll', icon: '💰' },
-  { path: '/dashboard/settings', label: 'Settings', icon: '⚙️' }
+  { path: '/', label: 'Overview', icon: '📊' },
+  { path: '/timesheets', label: 'Timesheets', icon: '📋' },
+  { path: '/invoices', label: 'Invoices', icon: '🧾' },
+  { path: '/payroll', label: 'Payroll', icon: '💰' },
+  { path: '/settings', label: 'Settings', icon: '⚙️' }
 ];
 
 function Sidebar({ open, onClose }) {
+  const { user, logout, authEnabled } = useAuth();
   return (
     <>
-      {/* Mobile overlay */}
       {open && (
         <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={onClose} />
       )}
@@ -31,7 +32,7 @@ function Sidebar({ open, onClose }) {
         <div className="px-4 py-5 border-b border-gray-700 flex items-center justify-between">
           <div>
             <h1 className="text-white font-bold text-lg leading-tight">🏥 Billing</h1>
-            <p className="text-gray-400 text-xs mt-1">Tech Adventures Demo</p>
+            <p className="text-gray-400 text-xs mt-1">Tampa Bay OT LLC</p>
           </div>
           <button className="md:hidden text-gray-400 hover:text-white text-2xl" onClick={onClose}>×</button>
         </div>
@@ -40,7 +41,7 @@ function Sidebar({ open, onClose }) {
             <NavLink
               key={item.path}
               to={item.path}
-              end={item.path === '/dashboard'}
+              end={item.path === '/'}
               onClick={onClose}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -56,11 +57,20 @@ function Sidebar({ open, onClose }) {
           ))}
         </nav>
         <div className="px-4 py-3 border-t border-gray-700">
+          {user && authEnabled && (
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-gray-400 text-xs">👤 {user.name}</span>
+              <button onClick={logout} className="text-gray-500 hover:text-red-400 text-xs transition-colors">
+                Logout
+              </button>
+            </div>
+          )}
+          <BugReporter variant="sidebar" />
           <a href="https://fltechadventures.com" target="_blank" rel="noopener noreferrer"
-            className="text-gray-500 hover:text-gray-300 text-xs block transition-colors">fltechadventures.com</a>
+            className="text-gray-500 hover:text-gray-300 text-xs block transition-colors mt-2">fltechadventures.com</a>
           <a href="mailto:alain@fltechadventures.com"
             className="text-gray-500 hover:text-gray-300 text-xs block transition-colors">alain@fltechadventures.com</a>
-          <p className="text-gray-600 text-xs mt-1">v1.1.0</p>
+          <p className="text-gray-600 text-xs mt-1">v1.2.0</p>
         </div>
       </aside>
     </>
@@ -79,31 +89,41 @@ function MobileHeader({ onMenuClick }) {
   );
 }
 
-export default function App() {
+function AuthenticatedApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/landing" element={<Landing onEnter={() => window.location.href = '/dashboard'} />} />
-        <Route path="/dashboard/*" element={
-          <div className="flex min-h-screen bg-gray-50">
-            <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="flex-1 flex flex-col min-w-0">
-              <MobileHeader onMenuClick={() => setSidebarOpen(true)} />
-              <main className="flex-1 overflow-auto">
-                <Routes>
-                  <Route path="/" element={<Overview />} />
-                  <Route path="/timesheets" element={<Timesheets />} />
-                  <Route path="/invoices" element={<Invoices />} />
-                  <Route path="/payroll" element={<Payroll />} />
-                  <Route path="/settings" element={<Settings />} />
-                </Routes>
-              </main>
-            </div>
-          </div>
-        } />
-        <Route path="/*" element={<Landing onEnter={() => window.location.href = '/dashboard'} />} />
-      </Routes>
+      <div className="flex min-h-screen bg-gray-50">
+        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <div className="flex-1 flex flex-col min-w-0">
+          <MobileHeader onMenuClick={() => setSidebarOpen(true)} />
+          <main className="flex-1 overflow-auto">
+            <Routes>
+              <Route path="/" element={<Overview />} />
+              <Route path="/timesheets" element={<Timesheets />} />
+              <Route path="/invoices" element={<Invoices />} />
+              <Route path="/payroll" element={<Payroll />} />
+              <Route path="/settings" element={<Settings />} />
+            </Routes>
+          </main>
+        </div>
+      </div>
     </BrowserRouter>
   );
 }
+
+export default function App() {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-gray-400">Loading...</div>
+      </div>
+    );
+  }
+
+  return isAuthenticated ? <AuthenticatedApp /> : <Login />;
+}
+
+// Wrap in main.jsx with AuthProvider
