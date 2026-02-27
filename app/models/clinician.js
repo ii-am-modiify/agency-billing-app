@@ -5,7 +5,7 @@ const clinicianSchema = new mongoose.Schema({
   title: { type: String }, // PTA, RN, OT, PT, etc.
   email: { type: String },
   phone: { type: String },
-  payRate: { type: Number, default: 0 }, // per hour
+  payRate: { type: Number, default: 0 }, // per visit
   agencies: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Agency' }],
   active: { type: Boolean, default: true },
   notes: { type: String }

@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import PeriodSelector from '../components/PeriodSelector';
-import { SkeletonTable } from '../components/Skeleton';
 
 function fmt(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n || 0);
 }
-function fmtNum(n) { return new Intl.NumberFormat('en-US').format(n || 0); }
 
 function exportCsv(rows) {
-  const headers = ['Name', 'Title', 'Pay Rate', 'Total Hours', 'Total Visits', 'Base Earnings', 'Adjustments', 'Total', 'Status'];
+  const headers = ['Name', 'Title', 'Pay Rate (per visit)', 'Total Hours', 'Total Visits', 'Base Earnings', 'Adjustments', 'Total', 'Status'];
   const lines = [headers.join(','), ...rows.map(r => [
     `"${r.name}"`, `"${r.title}"`, r.payRate, r.totalHours, r.totalVisits,
     r.earnings, r.adjustmentTotal || 0, r.finalAmount || r.earnings,
@@ -278,7 +276,7 @@ export default function Payroll() {
         <div>
           <h1 className="text-xl md:text-2xl font-bold">Payroll</h1>
           <p className="text-gray-500 text-sm">
-            {fmtNum(rows.length)} clinician{rows.length !== 1 ? 's' : ''} — <span className="font-medium">{period.label}</span>
+            {rows.length} clinician{rows.length !== 1 ? 's' : ''} — <span className="font-medium">{period.label}</span>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -295,8 +293,8 @@ export default function Payroll() {
           <div className="text-xs text-gray-500 mt-1">Total Payroll</div>
         </div>
         <div className="card text-center">
-          <div className="text-2xl font-bold text-blue-600">{fmtNum(Math.round(totals.hours || 0))}h</div>
-          <div className="text-xs text-gray-500 mt-1">Total Hours</div>
+          <div className="text-2xl font-bold text-blue-600">{totals.visits || 0}</div>
+          <div className="text-xs text-gray-500 mt-1">Total Visits</div>
         </div>
         <div className="card text-center">
           <div className="text-2xl font-bold text-green-600">{fmt(paidTotal)}</div>
@@ -345,7 +343,7 @@ export default function Payroll() {
           </thead>
           <tbody>
             {loading ? (
-              <SkeletonTable rows={15} cols={9} />
+              <tr><td colSpan={9} className="text-center py-12 text-gray-400">Loading...</td></tr>
             ) : filteredRows.length === 0 ? (
               <tr><td colSpan={9} className="text-center py-12 text-gray-400">
                 No payroll data. Process timesheets first.
@@ -357,9 +355,9 @@ export default function Payroll() {
                     <div className="font-medium">{r.name}</div>
                     {r.title && <div className="text-xs text-gray-400">{r.title}</div>}
                   </td>
-                  <td className="table-cell text-sm">{r.payRate ? `${fmt(r.payRate)}/hr` : '—'}</td>
-                  <td className="table-cell text-sm">{fmtNum(r.totalHours)}h</td>
-                  <td className="table-cell text-sm">{fmtNum(r.totalVisits)}</td>
+                  <td className="table-cell text-sm">{r.payRate ? `${fmt(r.payRate)}/visit` : '—'}</td>
+                  <td className="table-cell text-sm">{r.totalHours}h</td>
+                  <td className="table-cell text-sm">{r.totalVisits}</td>
                   <td className="table-cell text-sm">{fmt(r.earnings)}</td>
                   <td className="table-cell text-sm">
                     {r.adjustmentTotal !== 0 ? (
