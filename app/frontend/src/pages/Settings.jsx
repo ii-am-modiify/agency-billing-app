@@ -1,69 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-
-function fmtNum(n) { return new Intl.NumberFormat('en-US').format(n || 0); }
-
-const PER_PAGE = 30;
-
-function useSearchPaginate(items, searchFields) {
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-
-  const filtered = useMemo(() => {
-    if (!search.trim()) return items;
-    const q = search.toLowerCase();
-    return items.filter(item =>
-      searchFields.some(fn => {
-        const val = typeof fn === 'function' ? fn(item) : item[fn];
-        return val && String(val).toLowerCase().includes(q);
-      })
-    );
-  }, [items, search, searchFields]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
-  const safePage = Math.min(page, totalPages);
-  const paginated = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
-
-  // Reset page when search changes
-  useEffect(() => { setPage(1); }, [search]);
-
-  return { search, setSearch, page: safePage, setPage, filtered, paginated, totalPages };
-}
-
-function PaginationBar({ page, totalPages, setPage, filteredCount, totalCount, label }) {
-  if (totalCount <= PER_PAGE && !filteredCount) return null;
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t bg-gray-50 text-sm">
-      <span className="text-gray-500">
-        Showing {fmtNum(((page - 1) * PER_PAGE) + 1)}–{fmtNum(Math.min(page * PER_PAGE, filteredCount))} of {fmtNum(filteredCount)}
-        {filteredCount !== totalCount && <span className="text-gray-400"> (filtered from {fmtNum(totalCount)})</span>}
-        {label && <span className="text-gray-400"> {label}</span>}
-      </span>
-      <div className="flex gap-1">
-        <button onClick={() => setPage(1)} disabled={page <= 1}
-          className="px-2 py-1 rounded border text-xs disabled:opacity-30 hover:bg-gray-100">«</button>
-        <button onClick={() => setPage(page - 1)} disabled={page <= 1}
-          className="px-2 py-1 rounded border text-xs disabled:opacity-30 hover:bg-gray-100">‹</button>
-        <span className="px-3 py-1 text-xs text-gray-600">{page} / {totalPages}</span>
-        <button onClick={() => setPage(page + 1)} disabled={page >= totalPages}
-          className="px-2 py-1 rounded border text-xs disabled:opacity-30 hover:bg-gray-100">›</button>
-        <button onClick={() => setPage(totalPages)} disabled={page >= totalPages}
-          className="px-2 py-1 rounded border text-xs disabled:opacity-30 hover:bg-gray-100">»</button>
-      </div>
-    </div>
-  );
-}
-
-function SearchBar({ value, onChange, placeholder }) {
-  return (
-    <input
-      type="text"
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder || 'Search...'}
-      className="border rounded-lg px-3 py-2 text-sm w-full max-w-xs"
-    />
-  );
-}
+import React, { useState, useEffect, useRef } from 'react';
 
 // ─── Agency Modal (with Rate Card Editor) ────────────────────────────────────
 
@@ -476,184 +411,6 @@ function PatientModal({ patient, agencies, onClose, onSave }) {
 
 // ─── Main Settings Page ───────────────────────────────────────────────────────
 
-/* ── Agencies Tab with Search + Pagination ── */
-function AgenciesTab({ agencies, onEdit, onDelete }) {
-  const FIELDS = ['name', 'contactName', 'contactEmail', a => a.address];
-  const { search, setSearch, page, setPage, filtered, paginated, totalPages } = useSearchPaginate(agencies, FIELDS);
-
-  return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h2 className="font-semibold">Agencies ({fmtNum(filtered.length)} of {fmtNum(agencies.length)})</h2>
-        <div className="flex items-center gap-2">
-          <SearchBar value={search} onChange={setSearch} placeholder="Search agencies..." />
-          <button onClick={() => onEdit('new')} className="btn-primary text-sm">+ Add</button>
-        </div>
-      </div>
-      <div className="card p-0 overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="table-header">Name</th>
-              <th className="table-header">Contact</th>
-              <th className="table-header">Default Rate</th>
-              <th className="table-header">Rates</th>
-              <th className="table-header">Status</th>
-              <th className="table-header">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginated.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-10 text-gray-400">
-                {search ? 'No agencies match your search' : 'No agencies yet'}
-              </td></tr>
-            ) : paginated.map(a => {
-              const rateCount = Object.keys(a.rates || {}).length;
-              return (
-                <tr key={a._id} className="border-b hover:bg-gray-50">
-                  <td className="table-cell font-medium">{a.name}</td>
-                  <td className="table-cell text-sm">
-                    <div>{a.contactName}</div>
-                    <div className="text-gray-400 text-xs">{a.contactEmail}</div>
-                  </td>
-                  <td className="table-cell">${a.billingRate?.default || 0}/hr</td>
-                  <td className="table-cell text-sm">
-                    {rateCount > 0
-                      ? <span className="badge bg-green-100 text-green-700">{rateCount} code{rateCount !== 1 ? 's' : ''}</span>
-                      : <span className="text-gray-400 text-xs">Default</span>}
-                  </td>
-                  <td className="table-cell">
-                    <span className={`badge ${a.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {a.active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="table-cell">
-                    <div className="flex gap-2">
-                      <button onClick={() => onEdit(a)} className="text-blue-600 text-xs hover:underline">Edit</button>
-                      {a.active && <button onClick={() => onDelete(a._id)} className="text-red-500 text-xs hover:underline">Deactivate</button>}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        <PaginationBar page={page} totalPages={totalPages} setPage={setPage}
-          filteredCount={filtered.length} totalCount={agencies.length} />
-      </div>
-    </div>
-  );
-}
-
-/* ── Patients Tab with Search + Pagination ── */
-function PatientsTab({ patients, onEdit, onDelete }) {
-  const FIELDS = ['name', p => p.agencyId?.name, 'address', 'clinicalRecordNumber'];
-  const { search, setSearch, page, setPage, filtered, paginated, totalPages } = useSearchPaginate(patients, FIELDS);
-
-  return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div>
-          <h2 className="font-semibold">Patients ({fmtNum(filtered.length)} of {fmtNum(patients.length)})</h2>
-          <p className="text-xs text-gray-400 mt-0.5">OCR fuzzy-matches against this list</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <SearchBar value={search} onChange={setSearch} placeholder="Search patients..." />
-          <button onClick={() => onEdit('new')} className="btn-primary text-sm">+ Add</button>
-        </div>
-      </div>
-      <div className="card p-0 overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="table-header">Name</th>
-              <th className="table-header">Agency</th>
-              <th className="table-header">Record #</th>
-              {/* address hidden */}
-              <th className="table-header">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginated.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-10 text-gray-400">
-                {search ? 'No patients match your search' : 'No patients yet'}
-              </td></tr>
-            ) : paginated.map(p => (
-              <tr key={p._id} className="border-b hover:bg-gray-50">
-                <td className="table-cell font-medium">{p.name}</td>
-                <td className="table-cell text-sm">{p.agencyId?.name || <span className="text-gray-400">—</span>}</td>
-                <td className="table-cell text-sm text-gray-500">{p.clinicalRecordNumber || '—'}</td>
-                {/* address hidden for demo */}
-                <td className="table-cell">
-                  <div className="flex gap-2">
-                    <button onClick={() => onEdit(p)} className="text-blue-600 text-xs hover:underline">Edit</button>
-                    <button onClick={() => onDelete(p._id)} className="text-red-500 text-xs hover:underline">Deactivate</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <PaginationBar page={page} totalPages={totalPages} setPage={setPage}
-          filteredCount={filtered.length} totalCount={patients.length} />
-      </div>
-    </div>
-  );
-}
-
-/* ── Clinicians Tab with Search + Pagination ── */
-function CliniciansTab({ clinicians, onEdit, onDelete }) {
-  const FIELDS = ['name', 'title', c => (c.agencies || []).map(a => a.name).join(' ')];
-  const { search, setSearch, page, setPage, filtered, paginated, totalPages } = useSearchPaginate(clinicians, FIELDS);
-
-  return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h2 className="font-semibold">Clinicians ({fmtNum(filtered.length)} of {fmtNum(clinicians.length)})</h2>
-        <div className="flex items-center gap-2">
-          <SearchBar value={search} onChange={setSearch} placeholder="Search clinicians..." />
-          <button onClick={() => onEdit('new')} className="btn-primary text-sm">+ Add</button>
-        </div>
-      </div>
-      <div className="card p-0 overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="table-header">Name</th>
-              <th className="table-header">Title</th>
-              <th className="table-header">Pay Rate</th>
-              <th className="table-header">Agencies</th>
-              <th className="table-header">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginated.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-10 text-gray-400">
-                {search ? 'No clinicians match your search' : 'No clinicians yet'}
-              </td></tr>
-            ) : paginated.map(c => (
-              <tr key={c._id} className="border-b hover:bg-gray-50">
-                <td className="table-cell font-medium">{c.name}</td>
-                <td className="table-cell"><span className="badge bg-blue-100 text-blue-700">{c.title || '—'}</span></td>
-                <td className="table-cell">{c.payRate ? `$${c.payRate}/hr` : '—'}</td>
-                <td className="table-cell text-xs text-gray-500">{(c.agencies || []).map(a => a.name).join(', ') || '—'}</td>
-                <td className="table-cell">
-                  <div className="flex gap-2">
-                    <button onClick={() => onEdit(c)} className="text-blue-600 text-xs hover:underline">Edit</button>
-                    <button onClick={() => onDelete(c._id)} className="text-red-500 text-xs hover:underline">Deactivate</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <PaginationBar page={page} totalPages={totalPages} setPage={setPage}
-          filteredCount={filtered.length} totalCount={clinicians.length} />
-      </div>
-    </div>
-  );
-}
-
 export default function Settings() {
   const [agencies,        setAgencies]        = useState([]);
   const [clinicians,      setClinicians]      = useState([]);
@@ -919,19 +676,158 @@ export default function Settings() {
         ))}
       </div>
 
-      {loading ? <div className="animate-pulse space-y-3 py-6">{[1,2,3,4,5].map(i => <div key={i} className="h-10 bg-gray-200 rounded"></div>)}</div> : (
+      {loading ? <div className="text-center py-12 text-gray-400">Loading...</div> : (
         <>
           {/* ─── Agencies ─────────────────────────────────────────────── */}
           {tab === 'agencies' && (
-            <AgenciesTab agencies={agencies} onEdit={setAgencyModal} onDelete={deleteAgency} />
+            <div>
+              <div className="flex justify-between mb-4">
+                <h2 className="font-semibold">Agencies ({agencies.filter(a => a.active).length} active)</h2>
+                <button onClick={() => setAgencyModal('new')} className="btn-primary">+ Add Agency</button>
+              </div>
+              <div className="card p-0 overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="table-header">Name</th>
+                      <th className="table-header">Contact</th>
+                      <th className="table-header">Default Rate</th>
+                      <th className="table-header">Rates Configured</th>
+                      <th className="table-header">Status</th>
+                      <th className="table-header">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {agencies.length === 0 ? (
+                      <tr><td colSpan={6} className="text-center py-10 text-gray-400">No agencies yet</td></tr>
+                    ) : agencies.map(a => {
+                      const ratesObj = a.rates || {};
+                      const rateCount = Object.keys(ratesObj).length;
+                      return (
+                        <tr key={a._id} className="border-b hover:bg-gray-50">
+                          <td className="table-cell font-medium">{a.name}</td>
+                          <td className="table-cell text-sm">
+                            <div>{a.contactName}</div>
+                            <div className="text-gray-400 text-xs">{a.contactEmail}</div>
+                          </td>
+                          <td className="table-cell">${a.billingRate?.default || 0}/hr</td>
+                          <td className="table-cell text-sm">
+                            {rateCount > 0
+                              ? <span className="badge bg-green-100 text-green-700">{rateCount} code{rateCount !== 1 ? 's' : ''}</span>
+                              : <span className="text-gray-400 text-xs">None — using default</span>
+                            }
+                          </td>
+                          <td className="table-cell">
+                            <span className={`badge ${a.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                              {a.active ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="table-cell">
+                            <div className="flex gap-2">
+                              <button onClick={() => setAgencyModal(a)} className="text-blue-600 text-xs hover:underline">Edit</button>
+                              {a.active && (
+                                <button onClick={() => deleteAgency(a._id)} className="text-red-500 text-xs hover:underline">Deactivate</button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
 
+          {/* ─── Patients ────────────────────────────────────────────── */}
           {tab === 'patients' && (
-            <PatientsTab patients={patients} onEdit={setPatientModal} onDelete={deletePatient} />
+            <div>
+              <div className="flex justify-between mb-4">
+                <div>
+                  <h2 className="font-semibold">Patients ({patients.length})</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Known patient names — OCR fuzzy-matches against this list for accuracy</p>
+                </div>
+                <button onClick={() => setPatientModal('new')} className="btn-primary">+ Add Patient</button>
+              </div>
+              <div className="card p-0 overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="table-header">Name</th>
+                      <th className="table-header">Agency</th>
+                      <th className="table-header">Record #</th>
+                      <th className="table-header">Address</th>
+                      <th className="table-header">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {patients.length === 0 ? (
+                      <tr><td colSpan={5} className="text-center py-10 text-gray-400">No patients yet — they'll be auto-created from timesheets</td></tr>
+                    ) : patients.map(p => (
+                      <tr key={p._id} className="border-b hover:bg-gray-50">
+                        <td className="table-cell font-medium">{p.name}</td>
+                        <td className="table-cell text-sm">
+                          {p.agencyId?.name || <span className="text-gray-400">—</span>}
+                        </td>
+                        <td className="table-cell text-sm text-gray-500">{p.clinicalRecordNumber || '—'}</td>
+                        <td className="table-cell text-sm text-gray-500 truncate max-w-[200px]" title={p.address}>{p.address || '—'}</td>
+                        <td className="table-cell">
+                          <div className="flex gap-2">
+                            <button onClick={() => setPatientModal(p)} className="text-blue-600 text-xs hover:underline">Edit</button>
+                            <button onClick={() => deletePatient(p._id)} className="text-red-500 text-xs hover:underline">Deactivate</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
 
+          {/* ─── Clinicians ───────────────────────────────────────────── */}
           {tab === 'clinicians' && (
-            <CliniciansTab clinicians={clinicians} onEdit={setClinicianModal} onDelete={deleteClinician} />
+            <div>
+              <div className="flex justify-between mb-4">
+                <h2 className="font-semibold">Clinicians ({clinicians.length})</h2>
+                <button onClick={() => setClinicianModal('new')} className="btn-primary">+ Add Clinician</button>
+              </div>
+              <div className="card p-0 overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="table-header">Name</th>
+                      <th className="table-header">Title</th>
+                      <th className="table-header">Pay Rate</th>
+                      <th className="table-header">Agencies</th>
+                      <th className="table-header">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clinicians.length === 0 ? (
+                      <tr><td colSpan={5} className="text-center py-10 text-gray-400">No clinicians yet</td></tr>
+                    ) : clinicians.map(c => (
+                      <tr key={c._id} className="border-b hover:bg-gray-50">
+                        <td className="table-cell font-medium">{c.name}</td>
+                        <td className="table-cell">
+                          <span className="badge bg-blue-100 text-blue-700">{c.title || '—'}</span>
+                        </td>
+                        <td className="table-cell">{c.payRate ? `$${c.payRate}/hr` : '—'}</td>
+                        <td className="table-cell text-xs text-gray-500">
+                          {(c.agencies || []).map(a => a.name).join(', ') || '—'}
+                        </td>
+                        <td className="table-cell">
+                          <div className="flex gap-2">
+                            <button onClick={() => setClinicianModal(c)} className="text-blue-600 text-xs hover:underline">Edit</button>
+                            <button onClick={() => deleteClinician(c._id)} className="text-red-500 text-xs hover:underline">Deactivate</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
 
           {/* ─── Billing Periods ──────────────────────────────────────── */}
@@ -1084,13 +980,13 @@ export default function Settings() {
               </div>
 
               <div className="card p-0 overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[760px]">
                   <thead className="bg-gray-50 border-b">
                     <tr>
-                      <th className="table-header w-24">Code</th>
-                      <th className="table-header">Description</th>
-                      <th className="table-header w-36">Default Rate</th>
-                      <th className="table-header w-28">Actions</th>
+                      <th className="table-header w-44">Code</th>
+                      <th className="table-header min-w-[280px]">Description</th>
+                      <th className="table-header w-40">Default Rate</th>
+                      <th className="table-header w-32">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1100,7 +996,7 @@ export default function Settings() {
                           <td className="table-cell">
                             <input value={editCodeForm.code}
                               onChange={e => setEditCodeForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
-                              className="border rounded px-2 py-1 text-sm w-20 font-mono" />
+                              className="border rounded px-2 py-1 text-sm w-full max-w-[170px] font-mono" />
                           </td>
                           <td className="table-cell">
                             <input value={editCodeForm.description}
@@ -1143,7 +1039,7 @@ export default function Settings() {
                           <input value={newCodeForm.code}
                             onChange={e => setNewCodeForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
                             placeholder="CODE" maxLength={10}
-                            className="border rounded px-2 py-1 text-sm w-20 font-mono" autoFocus />
+                            className="border rounded px-2 py-1 text-sm w-full max-w-[170px] font-mono" autoFocus />
                         </td>
                         <td className="table-cell">
                           <input value={newCodeForm.description}
